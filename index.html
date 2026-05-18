@@ -712,19 +712,35 @@ async function renderReceitas() {
 }
 
 // ============================
-// PORTAL DO PACIENTE
+// PORTAL DO PACIENTE (simplificado)
 // ============================
+let portalPaciente = null;
+let portalDocs = [];
+let portalTermos = [];
+let portalReceita = null;
+let portalAssocs = [];
+let portalStep = 'documentos'; // documentos | compras | concluido
+let assocSelecionada = null;
+
 async function renderPatientPortal() {
   const { data: paciente } = await db.from('pacientes').select('*').eq('user_id', currentUser.id).single();
+  portalPaciente = paciente;
   const { data: assocs } = await db.from('associacoes').select('*');
-  const { data: receita } = await db.from('receitas').select('*').eq('paciente_id', paciente?.id).order('criado_em', { ascending: false }).limit(1);
-  const { data: docs } = await db.from('documentos').select('*').eq('paciente_id', paciente?.id);
-  const { data: termos } = await db.from('termos').select('*').eq('paciente_id', paciente?.id);
-
+  portalAssocs = assocs || [];
+  if (paciente) {
+    const { data: receitas } = await db.from('receitas').select('*').eq('paciente_id', paciente.id).order('criado_em', {ascending:false}).limit(1);
+    const { data: docs } = await db.from('documentos').select('*').eq('paciente_id', paciente.id);
+    const { data: termos } = await db.from('termos').select('*').eq('paciente_id', paciente.id);
+    portalReceita = receitas?.[0] || null;
+    portalDocs = docs || [];
+    portalTermos = termos || [];
+  }
   const status = paciente?.status || 'cadastrado';
-  const statusOrder = ['cadastrado','consulta_agendada','consulta_realizada','pos_consulta','pedido_feito','concluido'];
-  const statusIdx = statusOrder.indexOf(status);
-  const liberado = statusIdx >= 2; // consulta realizada ou mais
+  if (status === 'pedido_feito' || status === 'concluido') portalStep = 'concluido';
+
+  const stepLabels = ['Documentos','Compras','Concluído'];
+  const stepKeys = ['documentos','compras','concluido'];
+  const stepIdx = stepKeys.indexOf(portalStep);
 
   document.getElementById('root').innerHTML = `
     <div class="patient-portal">
@@ -735,143 +751,177 @@ async function renderPatientPortal() {
           <button class="btn btn-sm" style="background:rgba(255,255,255,0.2);color:#fff;border:none" onclick="doLogout()">Sair</button>
         </div>
       </div>
-
       <div class="portal-content">
-        <!-- ETAPAS -->
-        <div class="card" style="margin-bottom:1rem">
-          <div style="font-size:13px;font-weight:500;margin-bottom:12px">Sua jornada</div>
+        <div class="card" style="margin-bottom:1.25rem">
+          <div style="font-size:12px;color:var(--cinza);margin-bottom:10px">Etapa ${stepIdx+1} de ${stepLabels.length}</div>
           <div class="steps">
-            ${['Cadastro','Consulta','Documentos','Pedido','Concluído'].map((s,i)=>`
+            ${stepLabels.map((s,i)=>`
               <div class="step">
-                <div class="step-dot ${statusIdx>i?'done':statusIdx===i?'active':'pending'}">${statusIdx>i?icon('check'):(i+1)}</div>
-                ${i<4?`<div class="step-line ${statusIdx>i?'done':''}"></div>`:''}
+                <div class="step-dot ${i<stepIdx?'done':i===stepIdx?'active':'pending'}">${i<stepIdx?icon('check'):(i+1)}</div>
+                ${i<stepLabels.length-1?`<div class="step-line ${i<stepIdx?'done':''}"></div>`:''}
               </div>
             `).join('')}
           </div>
-          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--cinza);margin-top:4px">
-            ${['Cadastro','Consulta','Documentos','Pedido','Concluído'].map(s=>`<span>${s}</span>`).join('')}
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--cinza);margin-top:6px">
+            ${stepLabels.map(s=>`<span>${s}</span>`).join('')}
           </div>
         </div>
+        <div id="portal-step-content"></div>
+      </div>
+    </div>
+  `;
+  renderPortalStep();
+}
 
-        <!-- PRÉ-CONSULTA: ANAMNESE -->
-        <div class="portal-section">
-          <h3>📋 Anamnese</h3>
-          <p style="font-size:13px;color:var(--cinza);margin-bottom:1rem">Preencha antes da consulta com o médico.</p>
-          <div class="field"><label>Motivo da consulta</label><textarea id="an-motivo" placeholder="Descreva seu principal problema ou queixa..."></textarea></div>
-          <div class="field"><label>Doenças crônicas</label><input id="an-doencas" placeholder="Ex: diabetes, hipertensão..."/></div>
-          <div class="field"><label>Medicamentos em uso</label><input id="an-meds" placeholder="Liste os medicamentos atuais..."/></div>
-          <div class="field"><label>Alergias</label><input id="an-alergias" placeholder="Ex: dipirona, penicilina..."/></div>
-          <div class="field"><label>Já usou cannabis medicinal?</label><select id="an-cannabis"><option value="false">Não</option><option value="true">Sim</option></select></div>
-          <div class="field"><label>Expectativas</label><textarea id="an-exp" placeholder="O que espera do tratamento?"></textarea></div>
-          <button class="btn btn-primary" onclick="salvarAnamnese('${paciente?.id}')">Salvar anamnese</button>
+function renderPortalStep() {
+  const el = document.getElementById('portal-step-content');
+  if (!el) return;
+  if (portalStep === 'documentos') renderStepDocumentos(el);
+  else if (portalStep === 'compras') renderStepCompras(el);
+  else renderStepConcluido(el);
+}
+
+function renderStepDocumentos(el) {
+  const tiposDoc = [
+    ['rg_frente','RG — frente','📄'],
+    ['rg_verso','RG — verso','📄'],
+    ['comprovante_endereco','Comprovante de endereço','🏠'],
+    ['termo_ajuizamento','Termo de ajuizamento','✍️'],
+  ];
+  const tiposTermo = [
+    ['lgpd','Termo LGPD — uso dos seus dados'],
+    ['consentimento','Consentimento Informado'],
+  ];
+  const todosDocEnviados = tiposDoc.every(([tipo]) => portalDocs.find(d=>d.tipo===tipo));
+  const todosTermosAceitos = tiposTermo.every(([tipo]) => portalTermos.find(t=>t.tipo===tipo&&t.aceito));
+  const podeAvancar = todosDocEnviados && todosTermosAceitos;
+
+  el.innerHTML = `
+    <div class="portal-section">
+      <h3>📎 Documentos</h3>
+      <p style="font-size:13px;color:var(--cinza);margin-bottom:1.25rem">Envie os documentos solicitados para prosseguir com o pedido.</p>
+      <div style="display:grid;gap:8px;margin-bottom:1.5rem">
+        ${tiposDoc.map(([tipo,label,emoji])=>{
+          const enviado = portalDocs.find(d=>d.tipo===tipo);
+          return `<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--cinza-claro);border-radius:10px;border:1px solid ${enviado?'var(--verde-medio)':'var(--borda)'}">
+            <span style="font-size:14px">${emoji} ${label}</span>
+            ${enviado
+              ? `<span class="badge badge-verde">${icon('check')} Enviado</span>`
+              : `<button class="btn btn-sm btn-outline" onclick="uploadDocPaciente('${portalPaciente?.id}','${tipo}','${label}')">Enviar</button>`
+            }
+          </div>`;
+        }).join('')}
+      </div>
+
+      <h3 style="margin-bottom:1rem">✍️ Termos</h3>
+      <div style="display:grid;gap:8px;margin-bottom:1.5rem">
+        ${tiposTermo.map(([tipo,label])=>{
+          const aceito = portalTermos.find(t=>t.tipo===tipo&&t.aceito);
+          return `<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--cinza-claro);border-radius:10px;border:1px solid ${aceito?'var(--verde-medio)':'var(--borda)'}">
+            <span style="font-size:13px">${label}</span>
+            ${aceito
+              ? `<span class="badge badge-verde">${icon('check')} Aceito</span>`
+              : `<button class="btn btn-sm btn-primary" onclick="aceitarTermo('${portalPaciente?.id}','${tipo}')">Li e aceito</button>`
+            }
+          </div>`;
+        }).join('')}
+      </div>
+
+      <button class="btn btn-primary btn-full" style="${podeAvancar?'':'opacity:0.5;cursor:not-allowed'}"
+        onclick="${podeAvancar?"portalStep='compras';renderPortalStep()":"toast('Envie todos os documentos e aceite os termos primeiro','error')"}">
+        ${podeAvancar ? 'Ir para compras →' : 'Complete todos os itens acima para continuar'}
+      </button>
+    </div>
+  `;
+}
+
+function renderStepCompras(el) {
+  const temReceita = !!portalReceita;
+  el.innerHTML = `
+    <div class="portal-section">
+      <h3>🌿 Escolha sua associação</h3>
+      ${!temReceita ? `
+        <div style="background:var(--cinza-claro);border-radius:var(--radius);padding:1.5rem;text-align:center;font-size:13px;color:var(--cinza);margin-bottom:1rem">
+          ${icon('lock')} Aguardando receita médica. Em breve sua associação será liberada.
         </div>
-
-        <!-- PÓS-CONSULTA -->
-        ${!liberado ? `
-          <div class="portal-section">
-            <div class="lock-msg">${icon('lock')} Disponível após a consulta com o médico.</div>
-            <div class="locked">
-              <h3>📎 Documentos e Termos</h3>
+      ` : `
+        <p style="font-size:13px;color:var(--cinza);margin-bottom:1.25rem">Escolha a associação indicada na sua receita médica:</p>
+        <div class="assoc-grid" style="margin-bottom:1.5rem">
+          ${portalAssocs.map(a=>`
+            <div class="assoc-card" onclick="selecionarAssocPortal('${a.id}','${a.nome}','${a.forma_pagamento}',this)">
+              <div style="font-size:28px;margin-bottom:8px">🌿</div>
+              <div class="assoc-name">${a.nome}</div>
+              <div class="assoc-tipo">${a.tipo==='importacao'?'Importação':'Nacional'}</div>
+              <div style="font-size:11px;color:var(--verde);margin-top:8px">${a.forma_pagamento==='lytex'?'💳 Pagamento online':'📱 PIX / Cartão'}</div>
             </div>
-          </div>
-        ` : `
-          <div class="portal-section">
-            <h3>📎 Enviar documentos</h3>
-            <p style="font-size:13px;color:var(--cinza);margin-bottom:1rem">Envie os documentos solicitados.</p>
-            <div style="display:grid;gap:8px">
-              ${[['rg_frente','RG (frente)'],['rg_verso','RG (verso)'],['comprovante_endereco','Comprovante de endereço'],['termo_ajuizamento','Termo de ajuizamento']].map(([tipo,label])=>{
-                const enviado = docs?.find(d=>d.tipo===tipo);
-                return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--cinza-claro);border-radius:8px">
-                  <span style="font-size:13px">${label}</span>
-                  ${enviado ? `<span class="badge badge-verde">${icon('check')} Enviado</span>` : `<button class="btn btn-sm btn-outline" onclick="enviarDocPaciente('${paciente?.id}','${tipo}','${label}')">Enviar</button>`}
-                </div>`;
-              }).join('')}
-            </div>
-          </div>
+          `).join('')}
+        </div>
+        <button class="btn btn-primary btn-full" onclick="finalizarPedido('${portalPaciente?.id}')">Confirmar pedido</button>
+      `}
+      <button class="btn btn-outline btn-full" style="margin-top:10px" onclick="portalStep='documentos';renderPortalStep()">← Voltar</button>
+    </div>
+  `;
+}
 
-          <!-- TERMOS -->
-          <div class="portal-section">
-            <h3>✍️ Termos</h3>
-            ${[['ajuizamento','Termo de Ajuizamento'],['lgpd','Termo LGPD'],['consentimento','Consentimento Informado']].map(([tipo,label])=>{
-              const aceito = termos?.find(t=>t.tipo===tipo&&t.aceito);
-              return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--cinza-claro);border-radius:8px;margin-bottom:6px">
-                <span style="font-size:13px">${label}</span>
-                ${aceito ? `<span class="badge badge-verde">${icon('check')} Aceito</span>` : `<button class="btn btn-sm btn-primary" onclick="aceitarTermo('${paciente?.id}','${tipo}')">Li e aceito</button>`}
-              </div>`;
-            }).join('')}
-          </div>
+function selecionarAssocPortal(id, nome, pagamento, el) {
+  assocSelecionada = { id, nome, pagamento };
+  document.querySelectorAll('.assoc-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+}
 
-          <!-- ASSOCIAÇÕES E PEDIDO -->
-          <div class="portal-section">
-            <h3>🌿 Fazer pedido</h3>
-            ${!receita?.length ? '<p style="font-size:13px;color:var(--cinza)">Aguardando receita médica para liberar os produtos.</p>' : `
-              <p style="font-size:13px;color:var(--cinza);margin-bottom:1rem">Escolha a associação prescrita na sua receita:</p>
-              <div class="assoc-grid" id="assoc-grid">
-                ${(assocs||[]).map(a=>`
-                  <div class="assoc-card" onclick="selecionarAssoc('${a.id}','${a.nome}','${a.forma_pagamento}')">
-                    <div style="font-size:24px;margin-bottom:6px">🌿</div>
-                    <div class="assoc-name">${a.nome}</div>
-                    <div class="assoc-tipo">${a.tipo}</div>
-                    <div style="font-size:11px;color:var(--verde);margin-top:6px">${a.forma_pagamento==='lytex'?'Pagamento online':'PIX / Cartão'}</div>
-                  </div>
-                `).join('')}
-              </div>
-              <button class="btn btn-primary" style="margin-top:1rem;width:100%" onclick="finalizarPedido('${paciente?.id}')">Confirmar pedido</button>
-            `}
-          </div>
-        `}
+function renderStepConcluido(el) {
+  el.innerHTML = `
+    <div class="portal-section" style="text-align:center;padding:2.5rem 1.5rem">
+      <div style="font-size:48px;margin-bottom:1rem">🎉</div>
+      <h3 style="margin-bottom:8px">Pedido realizado!</h3>
+      <p style="font-size:14px;color:var(--cinza);margin-bottom:1.5rem">Recebemos seu pedido. Em breve você receberá as instruções de pagamento pelo WhatsApp ou email.</p>
+      <div style="background:var(--verde-suave);border-radius:var(--radius);padding:1rem;font-size:13px;color:var(--verde)">
+        Fique atento ao seu WhatsApp — enviaremos o link de pagamento em breve. 🌿
       </div>
     </div>
   `;
 }
 
-let assocSelecionada = null;
-function selecionarAssoc(id, nome, pagamento) {
-  assocSelecionada = { id, nome, pagamento };
-  document.querySelectorAll('.assoc-card').forEach(c => c.classList.remove('selected'));
-  event.currentTarget.classList.add('selected');
-}
-
-async function salvarAnamnese(pacienteId) {
-  if (!pacienteId) { toast('Perfil não encontrado', 'error'); return; }
-  const { error } = await db.from('anamneses').upsert({
-    paciente_id: pacienteId,
-    motivo_consulta: document.getElementById('an-motivo')?.value,
-    doencas_cronicas: document.getElementById('an-doencas')?.value,
-    medicamentos_uso: document.getElementById('an-meds')?.value,
-    alergias: document.getElementById('an-alergias')?.value,
-    uso_previo_cannabis: document.getElementById('an-cannabis')?.value === 'true',
-    expectativas: document.getElementById('an-exp')?.value,
-  });
-  if (error) { toast(error.message, 'error'); return; }
-  toast('Anamnese salva!');
-}
-
-async function enviarDocPaciente(pacienteId, tipo, label) {
-  const nome = prompt(`Nome do arquivo ${label}:`);
-  if (!nome) return;
-  await db.from('documentos').insert({ paciente_id: pacienteId, tipo, nome, enviado_por: 'paciente', data_doc: new Date().toISOString().split('T')[0] });
-  toast('Documento registrado!');
-  renderPatientPortal();
+async function uploadDocPaciente(pacienteId, tipo, label) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.pdf,.jpg,.jpeg,.png';
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+    const { error } = await db.from('documentos').insert({
+      paciente_id: pacienteId, tipo, nome: file.name,
+      enviado_por: 'paciente', data_doc: new Date().toISOString().split('T')[0]
+    });
+    if (error) { toast(error.message, 'error'); return; }
+    const { data: docs } = await db.from('documentos').select('*').eq('paciente_id', pacienteId);
+    portalDocs = docs || [];
+    toast(`${label} enviado!`);
+    renderPortalStep();
+  };
+  input.click();
 }
 
 async function aceitarTermo(pacienteId, tipo) {
   await db.from('termos').upsert({ paciente_id: pacienteId, tipo, aceito: true, assinado_em: new Date() });
+  const { data: termos } = await db.from('termos').select('*').eq('paciente_id', pacienteId);
+  portalTermos = termos || [];
   toast('Termo aceito!');
-  renderPatientPortal();
+  renderPortalStep();
 }
 
 async function finalizarPedido(pacienteId) {
   if (!assocSelecionada) { toast('Selecione uma associação', 'error'); return; }
-  await db.from('pedidos').insert({
+  const { error } = await db.from('pedidos').insert({
     paciente_id: pacienteId,
     associacao_id: assocSelecionada.id,
     forma_pagamento: assocSelecionada.pagamento === 'lytex' ? 'lytex' : 'pix',
     status: 'aguardando_pagamento'
   });
-  await db.from('pacientes').update({ status: 'pedido_feito' }).eq('id', pacienteId);
-  toast('Pedido realizado! Aguarde as instruções de pagamento.');
-  renderPatientPortal();
+  if (error) { toast(error.message, 'error'); return; }
+  await db.from('pacientes').update({ status: 'pedido_feito', atualizado_em: new Date() }).eq('id', pacienteId);
+  portalStep = 'concluido';
+  renderPortalStep();
 }
 
 // ============================
