@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clínica Cannabis</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --verde: #2d6a4f;
+  --verde-claro: #40916c;
+  --verde-suave: #d8f3dc;
+  --verde-medio: #b7e4c7;
+  --creme: #faf8f4;
+  --cinza: #6b7280;
+  --cinza-claro: #f3f4f6;
+  --texto: #1a1a1a;
+  --borda: #e5e7eb;
+  --branco: #ffffff;
+  --erro: #dc2626;
+  --aviso: #d97706;
+  --radius: 12px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', sans-serif; background: var(--creme); color: var(--texto); min-height: 100vh; }
+h1,h2,h3 { font-family: 'Playfair Display', serif; }
+
+/* AUTH */
+.auth-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #1b4332 0%, #2d6a4f 50%, #40916c 100%); }
+.auth-box { background: var(--branco); border-radius: 20px; padding: 2.5rem; width: 380px; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+.auth-logo { text-align: center; margin-bottom: 2rem; }
+.auth-logo h1 { font-size: 26px; color: var(--verde); }
+.auth-logo p { font-size: 13px; color: var(--cinza); margin-top: 4px; }
+.auth-tabs { display: flex; gap: 4px; background: var(--cinza-claro); border-radius: 8px; padding: 4px; margin-bottom: 1.5rem; }
+.auth-tab { flex: 1; padding: 8px; text-align: center; font-size: 13px; border-radius: 6px; cursor: pointer; border: none; background: none; color: var(--cinza); transition: all 0.2s; }
+.auth-tab.active { background: var(--branco); color: var(--verde); font-weight: 500; box-shadow: var(--shadow); }
+
+/* FORMS */
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 12px; color: var(--cinza); margin-bottom: 5px; font-weight: 500; }
+.field input, .field select, .field textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--borda); border-radius: 8px; font-size: 14px; font-family: 'DM Sans', sans-serif; background: var(--branco); color: var(--texto); transition: border-color 0.2s; }
+.field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--verde-claro); }
+.field textarea { min-height: 80px; resize: vertical; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* BUTTONS */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 18px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; border: none; transition: all 0.2s; font-family: 'DM Sans', sans-serif; }
+.btn-primary { background: var(--verde); color: var(--branco); }
+.btn-primary:hover { background: var(--verde-claro); }
+.btn-outline { background: transparent; border: 1px solid var(--borda); color: var(--texto); }
+.btn-outline:hover { background: var(--cinza-claro); }
+.btn-danger { background: #fee2e2; color: var(--erro); }
+.btn-danger:hover { background: #fecaca; }
+.btn-full { width: 100%; }
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+
+/* LAYOUT */
+.app-wrap { display: flex; min-height: 100vh; }
+.sidebar { width: 240px; background: var(--branco); border-right: 1px solid var(--borda); display: flex; flex-direction: column; position: fixed; height: 100vh; }
+.sidebar-logo { padding: 1.5rem; border-bottom: 1px solid var(--borda); }
+.sidebar-logo h2 { font-size: 18px; color: var(--verde); }
+.sidebar-logo p { font-size: 11px; color: var(--cinza); margin-top: 2px; }
+.sidebar-nav { flex: 1; padding: 1rem 0; overflow-y: auto; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 1.5rem; font-size: 14px; color: var(--cinza); cursor: pointer; transition: all 0.15s; border: none; background: none; width: 100%; text-align: left; }
+.nav-item:hover { background: var(--cinza-claro); color: var(--texto); }
+.nav-item.active { background: var(--verde-suave); color: var(--verde); font-weight: 500; }
+.nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+.sidebar-footer { padding: 1rem 1.5rem; border-top: 1px solid var(--borda); }
+.user-info { display: flex; align-items: center; gap: 10px; }
+.avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--verde-suave); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: var(--verde); flex-shrink: 0; }
+.user-name { font-size: 13px; font-weight: 500; }
+.user-role { font-size: 11px; color: var(--cinza); }
+.main { margin-left: 240px; flex: 1; padding: 2rem; }
+.page-header { margin-bottom: 1.5rem; }
+.page-header h1 { font-size: 24px; color: var(--texto); }
+.page-header p { font-size: 14px; color: var(--cinza); margin-top: 4px; }
+
+/* CARDS */
+.card { background: var(--branco); border: 1px solid var(--borda); border-radius: var(--radius); padding: 1.25rem; }
+.card-title { font-size: 14px; font-weight: 500; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px; }
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 1.5rem; }
+.stat-card { background: var(--branco); border: 1px solid var(--borda); border-radius: var(--radius); padding: 1rem 1.25rem; }
+.stat-label { font-size: 12px; color: var(--cinza); margin-bottom: 6px; }
+.stat-value { font-size: 28px; font-weight: 600; color: var(--texto); }
+.stat-sub { font-size: 12px; color: var(--verde); margin-top: 2px; }
+
+/* TABLE */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; padding: 10px 12px; background: var(--cinza-claro); color: var(--cinza); font-weight: 500; font-size: 12px; border-bottom: 1px solid var(--borda); }
+td { padding: 10px 12px; border-bottom: 1px solid var(--borda); color: var(--texto); vertical-align: middle; }
+tr:hover td { background: var(--creme); }
+tr:last-child td { border-bottom: none; }
+
+/* BADGES */
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+.badge-verde { background: var(--verde-suave); color: var(--verde); }
+.badge-cinza { background: var(--cinza-claro); color: var(--cinza); }
+.badge-aviso { background: #fef3c7; color: var(--aviso); }
+.badge-erro { background: #fee2e2; color: var(--erro); }
+.badge-azul { background: #dbeafe; color: #1d4ed8; }
+
+/* MODAL */
+.modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 999; padding: 1rem; }
+.modal { background: var(--branco); border-radius: 16px; padding: 1.5rem; width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; }
+.modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
+.modal-header h2 { font-size: 18px; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1.25rem; }
+
+/* STATUS STEPS */
+.steps { display: flex; gap: 0; margin-bottom: 1.5rem; overflow-x: auto; }
+.step { display: flex; align-items: center; flex: 1; min-width: 0; }
+.step-dot { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
+.step-dot.done { background: var(--verde); color: var(--branco); }
+.step-dot.active { background: var(--verde-suave); color: var(--verde); border: 2px solid var(--verde); }
+.step-dot.pending { background: var(--cinza-claro); color: var(--cinza); }
+.step-line { flex: 1; height: 2px; background: var(--borda); min-width: 20px; }
+.step-line.done { background: var(--verde); }
+
+/* UPLOAD */
+.upload-zone { border: 2px dashed var(--borda); border-radius: var(--radius); padding: 1.5rem; text-align: center; cursor: pointer; transition: all 0.2s; }
+.upload-zone:hover { border-color: var(--verde-claro); background: var(--verde-suave); }
+.upload-zone p { font-size: 13px; color: var(--cinza); margin-top: 8px; }
+
+/* NOTIFICATIONS */
+.toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--texto); color: var(--branco); padding: 12px 18px; border-radius: 10px; font-size: 13px; z-index: 9999; animation: slideIn 0.3s ease; }
+.toast.success { background: var(--verde); }
+.toast.error { background: var(--erro); }
+@keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+/* PACIENTE VIEW */
+.patient-portal { min-height: 100vh; background: var(--creme); }
+.portal-header { background: var(--verde); color: var(--branco); padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+.portal-header h2 { font-size: 18px; font-family: 'Playfair Display', serif; }
+.portal-content { max-width: 700px; margin: 0 auto; padding: 2rem 1rem; }
+.portal-section { background: var(--branco); border-radius: var(--radius); border: 1px solid var(--borda); padding: 1.5rem; margin-bottom: 1rem; }
+.portal-section h3 { font-size: 16px; margin-bottom: 1rem; color: var(--verde); }
+
+/* LOCKED */
+.locked { opacity: 0.5; pointer-events: none; position: relative; }
+.lock-msg { background: var(--cinza-claro); border-radius: 8px; padding: 12px; font-size: 13px; color: var(--cinza); text-align: center; margin-bottom: 1rem; }
+
+/* HIDDEN */
+.hidden { display: none !important; }
+
+/* SEARCH */
+.search-bar { display: flex; gap: 10px; margin-bottom: 1rem; }
+.search-bar input { flex: 1; padding: 9px 14px; border: 1px solid var(--borda); border-radius: 8px; font-size: 14px; font-family: 'DM Sans', sans-serif; }
+
+/* ASSOCIAÇÕES */
+.assoc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.assoc-card { border: 2px solid var(--borda); border-radius: var(--radius); padding: 1.25rem; cursor: pointer; transition: all 0.2s; text-align: center; }
+.assoc-card:hover { border-color: var(--verde-claro); }
+.assoc-card.selected { border-color: var(--verde); background: var(--verde-suave); }
+.assoc-card.locked-card { opacity: 0.4; pointer-events: none; }
+.assoc-name { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+.assoc-tipo { font-size: 11px; color: var(--cinza); }
+
+@media (max-width: 768px) {
+  .sidebar { transform: translateX(-100%); z-index: 100; }
+  .main { margin-left: 0; padding: 1rem; }
+  .field-row { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div id="root"></div>
+
+<script>
+const SUPABASE_URL = 'https://hdublarkjsprdjgldgyd.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhkdWJsYXJranNwcmRqZ2xkZ3lkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxMjY3MzksImV4cCI6MjA5NDcwMjczOX0._P8e9OpkkmTHG1vkPbPUg8478uIu979z9ihIFSZ4o0Q';
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let currentUser = null;
+let currentPerfil = null;
+let currentPage = 'dashboard';
+
+// ============================
+// UTILITÁRIOS
+// ============================
+function toast(msg, type='success') {
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+function initials(nome) {
+  return (nome||'').trim().split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('');
+}
+
+function statusBadge(status) {
+  const map = {
+    cadastrado: ['badge-cinza','Cadastrado'],
+    consulta_agendada: ['badge-aviso','Consulta Agendada'],
+    consulta_realizada: ['badge-azul','Consulta Realizada'],
+    pos_consulta: ['badge-aviso','Pós-Consulta'],
+    pedido_feito: ['badge-verde','Pedido Feito'],
+    concluido: ['badge-verde','Concluído'],
+    aguardando_pagamento: ['badge-aviso','Aguard. Pagamento'],
+    pago: ['badge-verde','Pago'],
+  };
+  const [cls, label] = map[status] || ['badge-cinza', status];
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+
+function icon(name) {
+  const icons = {
+    dashboard: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1" stroke-width="2"/><rect x="14" y="14" width="7" height="7" rx="1" stroke-width="2"/></svg>`,
+    users: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4" stroke-width="2"/><path stroke-width="2" d="M23 21v-2a4 4 0 0 0-3-3.87"/><path stroke-width="2" d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+    file: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8" stroke-width="2"/></svg>`,
+    calendar: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" stroke-width="2"/><line x1="16" y1="2" x2="16" y2="6" stroke-width="2"/><line x1="8" y1="2" x2="8" y2="6" stroke-width="2"/><line x1="3" y1="10" x2="21" y2="10" stroke-width="2"/></svg>`,
+    leaf: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M17 8C8 10 5.9 16.17 3.82 21.34 2.69 23.71 5 23 7 21c1.79-1.7 2.42-3.48 4-5 3.6-3.4 7.95-3.14 11-2 .6.21 1-.53 1-1V4c0-.58-.47-1.03-1-1-1 0-2 1-5 5z"/></svg>`,
+    logout: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7" stroke-width="2"/><line x1="21" y1="12" x2="9" y2="12" stroke-width="2"/></svg>`,
+    plus: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19" stroke-width="2"/><line x1="5" y1="12" x2="19" y2="12" stroke-width="2"/></svg>`,
+    upload: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><polyline points="16,16 12,12 8,16" stroke-width="2"/><line x1="12" y1="12" x2="12" y2="21" stroke-width="2"/><path stroke-width="2" d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>`,
+    check: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12" stroke-width="2.5"/></svg>`,
+    x: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18" stroke-width="2"/><line x1="6" y1="6" x2="18" y2="18" stroke-width="2"/></svg>`,
+    lock: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" stroke-width="2"/><path stroke-width="2" d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
+    shopping: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="9" cy="21" r="1" stroke-width="2"/><circle cx="20" cy="21" r="1" stroke-width="2"/><path stroke-width="2" d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>`,
+  };
+  return icons[name] || '';
+}
+
+// ============================
+// AUTH
+// ============================
+async function renderAuth() {
+  document.getElementById('root').innerHTML = `
+    <div class="auth-wrap">
+      <div class="auth-box">
+        <div class="auth-logo">
+          <h1>🌿 Clínica Cannabis</h1>
+          <p>Sistema de gestão integrado</p>
+        </div>
+        <div class="auth-tabs">
+          <button class="auth-tab active" onclick="showTab('login')">Entrar</button>
+          <button class="auth-tab" onclick="showTab('register')">Cadastrar</button>
+        </div>
+        <div id="tab-login">
+          <div class="field"><label>Email</label><input id="login-email" type="email" placeholder="seu@email.com"/></div>
+          <div class="field"><label>Senha</label><input id="login-pass" type="password" placeholder="••••••••"/></div>
+          <button class="btn btn-primary btn-full" onclick="doLogin()">Entrar</button>
+        </div>
+        <div id="tab-register" class="hidden">
+          <div class="field"><label>Nome completo</label><input id="reg-nome" placeholder="Maria Silva"/></div>
+          <div class="field"><label>Email</label><input id="reg-email" type="email" placeholder="seu@email.com"/></div>
+          <div class="field"><label>Senha</label><input id="reg-pass" type="password" placeholder="Mínimo 6 caracteres"/></div>
+          <button class="btn btn-primary btn-full" onclick="doRegister()">Criar conta</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function showTab(tab) {
+  document.querySelectorAll('.auth-tab').forEach((t,i) => t.classList.toggle('active', i === (tab==='login'?0:1)));
+  document.getElementById('tab-login').classList.toggle('hidden', tab !== 'login');
+  document.getElementById('tab-register').classList.toggle('hidden', tab !== 'register');
+}
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value;
+  const pass = document.getElementById('login-pass').value;
+  const { data, error } = await db.auth.signInWithPassword({ email, password: pass });
+  if (error) { toast(error.message, 'error'); return; }
+  await loadUserAndRender(data.user);
+}
+
+async function doRegister() {
+  const nome = document.getElementById('reg-nome').value;
+  const email = document.getElementById('reg-email').value;
+  const pass = document.getElementById('reg-pass').value;
+  if (!nome || !email || !pass) { toast('Preencha todos os campos', 'error'); return; }
+  const { data, error } = await db.auth.signUp({ email, password: pass });
+  if (error) { toast(error.message, 'error'); return; }
+  if (data.user) {
+    await db.from('perfis').insert({ id: data.user.id, nome, email, perfil: 'paciente' });
+    toast('Conta criada! Verifique seu email.');
+  }
+}
+
+async function loadUserAndRender(user) {
+  currentUser = user;
+  const { data } = await db.from('perfis').select('*').eq('id', user.id).single();
+  currentPerfil = data;
+  if (!currentPerfil) {
+    currentPerfil = { perfil: 'paciente', nome: user.email };
+  }
+  renderApp();
+}
+
+async function doLogout() {
+  await db.auth.signOut();
+  currentUser = null; currentPerfil = null;
+  renderAuth();
+}
+
+// ============================
+// APP SHELL
+// ============================
+function renderApp() {
+  const perfil = currentPerfil?.perfil || 'paciente';
+  if (perfil === 'paciente') { renderPatientPortal(); return; }
+
+  const navItems = perfil === 'admin' ? [
+    { id: 'dashboard', label: 'Dashboard', ic: 'dashboard' },
+    { id: 'pacientes', label: 'Pacientes', ic: 'users' },
+    { id: 'consultas', label: 'Consultas', ic: 'calendar' },
+    { id: 'documentos', label: 'Documentos', ic: 'file' },
+    { id: 'pedidos', label: 'Pedidos', ic: 'shopping' },
+    { id: 'associacoes', label: 'Associações', ic: 'leaf' },
+  ] : [
+    { id: 'dashboard', label: 'Dashboard', ic: 'dashboard' },
+    { id: 'pacientes', label: 'Pacientes', ic: 'users' },
+    { id: 'receitas', label: 'Receitas', ic: 'file' },
+  ];
+
+  document.getElementById('root').innerHTML = `
+    <div class="app-wrap">
+      <aside class="sidebar">
+        <div class="sidebar-logo">
+          <h2>🌿 Clínica</h2>
+          <p>${perfil === 'admin' ? 'Painel Administrativo' : 'Painel Médico'}</p>
+        </div>
+        <nav class="sidebar-nav" id="sidebar-nav">
+          ${navItems.map(n => `
+            <button class="nav-item ${currentPage===n.id?'active':''}" onclick="navigate('${n.id}')">
+              ${icon(n.ic)} ${n.label}
+            </button>
+          `).join('')}
+        </nav>
+        <div class="sidebar-footer">
+          <div class="user-info">
+            <div class="avatar">${initials(currentPerfil?.nome||'')}</div>
+            <div>
+              <div class="user-name">${currentPerfil?.nome||''}</div>
+              <div class="user-role">${perfil}</div>
+            </div>
+          </div>
+          <button class="btn btn-outline btn-sm" style="width:100%;margin-top:10px" onclick="doLogout()">
+            ${icon('logout')} Sair
+          </button>
+        </div>
+      </aside>
+      <main class="main" id="main-content"></main>
+    </div>
+  `;
+  navigate('dashboard');
+}
+
+function navigate(page) {
+  currentPage = page;
+  document.querySelectorAll('.nav-item').forEach(el => {
+    el.classList.toggle('active', el.textContent.trim().toLowerCase().includes(page) || el.getAttribute('onclick')?.includes(page));
+  });
+  const pages = { dashboard: renderDashboard, pacientes: renderPacientes, consultas: renderConsultas, documentos: renderDocumentos, pedidos: renderPedidos, associacoes: renderAssociacoes, receitas: renderReceitas };
+  if (pages[page]) pages[page]();
+}
+
+// ============================
+// DASHBOARD
+// ============================
+async function renderDashboard() {
+  const main = document.getElementById('main-content');
+  const { count: totalPacientes } = await db.from('pacientes').select('*', { count: 'exact', head: true });
+  const { count: posConsulta } = await db.from('pacientes').select('*', { count: 'exact', head: true }).eq('status', 'pos_consulta');
+  const { count: pedidos } = await db.from('pedidos').select('*', { count: 'exact', head: true });
+
+  main.innerHTML = `
+    <div class="page-header">
+      <h1>Dashboard</h1>
+      <p>Visão geral do sistema</p>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total de pacientes</div>
+        <div class="stat-value">${totalPacientes||0}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Aguard. pós-consulta</div>
+        <div class="stat-value">${posConsulta||0}</div>
+        <div class="stat-sub">ação necessária</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Pedidos realizados</div>
+        <div class="stat-value">${pedidos||0}</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">${icon('users')} Últimos pacientes</div>
+      <div id="dash-pacientes">Carregando...</div>
+    </div>
+  `;
+
+  const { data: pacs } = await db.from('pacientes').select('*').order('criado_em', { ascending: false }).limit(5);
+  const el = document.getElementById('dash-pacientes');
+  if (!pacs || pacs.length === 0) { el.innerHTML = '<p style="color:var(--cinza);font-size:13px">Nenhum paciente cadastrado ainda.</p>'; return; }
+  el.innerHTML = `<div class="table-wrap"><table>
+    <tr><th>Nome</th><th>CPF</th><th>Status</th><th>Cadastrado em</th></tr>
+    ${pacs.map(p => `<tr>
+      <td><strong>${p.nome}</strong></td>
+      <td>${p.cpf||'-'}</td>
+      <td>${statusBadge(p.status)}</td>
+      <td>${new Date(p.criado_em).toLocaleDateString('pt-BR')}</td>
+    </tr>`).join('')}
+  </table></div>`;
+}
+
+// ============================
+// PACIENTES
+// ============================
+async function renderPacientes() {
+  const main = document.getElementById('main-content');
+  main.innerHTML = `
+    <div class="page-header">
+      <h1>Pacientes</h1>
+    </div>
+    <div class="search-bar">
+      <input id="busca-pac" placeholder="Buscar por nome ou CPF..." oninput="filtrarPacientes()" />
+      <button class="btn btn-primary" onclick="abrirModalPaciente()">${icon('plus')} Novo paciente</button>
+    </div>
+    <div class="card">
+      <div id="lista-pacientes">Carregando...</div>
+    </div>
+    <div id="modal-paciente"></div>
+  `;
+  await carregarPacientes();
+}
+
+let todosOsPacientes = [];
+async function carregarPacientes() {
+  const { data } = await db.from('pacientes').select('*').order('criado_em', { ascending: false });
+  todosOsPacientes = data || [];
+  renderTabelaPacientes(todosOsPacientes);
+}
+
+function filtrarPacientes() {
+  const q = document.getElementById('busca-pac')?.value.toLowerCase() || '';
+  renderTabelaPacientes(todosOsPacientes.filter(p => p.nome.toLowerCase().includes(q) || (p.cpf||'').includes(q)));
+}
+
+function renderTabelaPacientes(pacs) {
+  const el = document.getElementById('lista-pacientes');
+  if (!pacs.length) { el.innerHTML = '<p style="color:var(--cinza);font-size:13px;padding:1rem 0">Nenhum paciente encontrado.</p>'; return; }
+  el.innerHTML = `<div class="table-wrap"><table>
+    <tr><th>Nome</th><th>CPF</th><th>Telefone</th><th>Status</th><th>Ações</th></tr>
+    ${pacs.map(p => `<tr>
+      <td><strong>${p.nome}</strong></td>
+      <td>${p.cpf||'-'}</td>
+      <td>${p.telefone||'-'}</td>
+      <td>${statusBadge(p.status)}</td>
+      <td>
+        <button class="btn btn-sm btn-outline" onclick="verPaciente('${p.id}')">Ver</button>
+        <button class="btn btn-sm btn-outline" onclick="avancarStatus('${p.id}','${p.status}')">Avançar</button>
+      </td>
+    </tr>`).join('')}
+  </table></div>`;
+}
+
+async function avancarStatus(id, statusAtual) {
+  const proximos = { cadastrado:'consulta_agendada', consulta_agendada:'consulta_realizada', consulta_realizada:'pos_consulta', pos_consulta:'pedido_feito', pedido_feito:'concluido' };
+  const proximo = proximos[statusAtual];
+  if (!proximo) { toast('Paciente já concluído', 'error'); return; }
+  await db.from('pacientes').update({ status: proximo, atualizado_em: new Date() }).eq('id', id);
+  toast('Status atualizado!');
+  await carregarPacientes();
+}
+
+function abrirModalPaciente() {
+  document.getElementById('modal-paciente').innerHTML = `
+    <div class="modal-bg" onclick="fecharModal()">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <h2>Novo Paciente</h2>
+          <button class="btn btn-sm btn-outline" onclick="fecharModal()">${icon('x')}</button>
+        </div>
+        <div class="field"><label>Nome completo *</label><input id="pac-nome" placeholder="Maria Silva"/></div>
+        <div class="field-row">
+          <div class="field"><label>CPF</label><input id="pac-cpf" placeholder="000.000.000-00"/></div>
+          <div class="field"><label>Nascimento</label><input id="pac-nasc" type="date"/></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Telefone</label><input id="pac-tel" placeholder="(11) 99999-0000"/></div>
+          <div class="field"><label>Email</label><input id="pac-email" type="email"/></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>CEP</label><input id="pac-cep" placeholder="00000-000" oninput="buscaCep(this.value)"/></div>
+          <div class="field"><label>Cidade</label><input id="pac-cidade"/></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Endereço</label><input id="pac-end"/></div>
+          <div class="field"><label>Número</label><input id="pac-num"/></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Bairro</label><input id="pac-bairro"/></div>
+          <div class="field"><label>Estado</label><input id="pac-estado"/></div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-outline" onclick="fecharModal()">Cancelar</button>
+          <button class="btn btn-primary" onclick="salvarPaciente()">Salvar</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function buscaCep(cep) {
+  cep = cep.replace(/\D/g,'');
+  if (cep.length !== 8) return;
+  try {
+    const r = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+    const d = await r.json();
+    if (!d.erro) {
+      document.getElementById('pac-end').value = d.logradouro || '';
+      document.getElementById('pac-bairro').value = d.bairro || '';
+      document.getElementById('pac-cidade').value = d.localidade || '';
+      document.getElementById('pac-estado').value = d.uf || '';
+    }
+  } catch(e) {}
+}
+
+async function salvarPaciente() {
+  const nome = document.getElementById('pac-nome')?.value?.trim();
+  if (!nome) { toast('Nome obrigatório', 'error'); return; }
+  const { error } = await db.from('pacientes').insert({
+    nome, cpf: document.getElementById('pac-cpf')?.value,
+    nascimento: document.getElementById('pac-nasc')?.value || null,
+    telefone: document.getElementById('pac-tel')?.value,
+    email: document.getElementById('pac-email')?.value,
+    cep: document.getElementById('pac-cep')?.value,
+    endereco: document.getElementById('pac-end')?.value,
+    numero: document.getElementById('pac-num')?.value,
+    bairro: document.getElementById('pac-bairro')?.value,
+    cidade: document.getElementById('pac-cidade')?.value,
+    estado: document.getElementById('pac-estado')?.value,
+    status: 'cadastrado'
+  });
+  if (error) { toast(error.message, 'error'); return; }
+  toast('Paciente salvo!');
+  fecharModal();
+  await carregarPacientes();
+}
+
+async function verPaciente(id) {
+  const { data: p } = await db.from('pacientes').select('*').eq('id', id).single();
+  const { data: docs } = await db.from('documentos').select('*').eq('paciente_id', id);
+  const { data: receitas } = await db.from('receitas').select('*').eq('paciente_id', id);
+  const { data: pedidos } = await db.from('pedidos').select('*, associacoes(nome)').eq('paciente_id', id);
+
+  document.getElementById('modal-paciente').innerHTML = `
+    <div class="modal-bg" onclick="fecharModal()">
+      <div class="modal" style="max-width:620px" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <h2>${p.nome}</h2>
+          <button class="btn btn-sm btn-outline" onclick="fecharModal()">${icon('x')}</button>
+        </div>
+        <p style="font-size:13px;color:var(--cinza);margin-bottom:1rem">Status: ${statusBadge(p.status)} · CPF: ${p.cpf||'-'} · Tel: ${p.telefone||'-'}</p>
+        <p style="font-size:13px;color:var(--cinza);margin-bottom:1.25rem">Endereço: ${[p.endereco,p.numero,p.bairro,p.cidade,p.estado].filter(Boolean).join(', ')||'-'}</p>
+
+        <div style="margin-bottom:1rem">
+          <div class="card-title">${icon('file')} Receitas</div>
+          ${receitas?.length ? receitas.map(r=>`<p style="font-size:13px">📄 ${r.arquivo_nome||'Receita'} — ${r.data_receita||''} ${r.produtos_prescritos?'· IA: '+JSON.stringify(r.produtos_prescritos).slice(0,60):''}</p>`).join('') : '<p style="font-size:13px;color:var(--cinza)">Nenhuma receita</p>'}
+          <button class="btn btn-sm btn-outline" style="margin-top:8px" onclick="uploadReceita('${id}')">+ Anexar receita</button>
+        </div>
+
+        <div style="margin-bottom:1rem">
+          <div class="card-title">${icon('file')} Documentos</div>
+          ${docs?.length ? docs.map(d=>`<p style="font-size:13px">📎 ${d.nome} (${d.tipo})</p>`).join('') : '<p style="font-size:13px;color:var(--cinza)">Nenhum documento</p>'}
+          <button class="btn btn-sm btn-outline" style="margin-top:8px" onclick="adicionarDoc('${id}')">+ Adicionar documento</button>
+        </div>
+
+        <div>
+          <div class="card-title">${icon('shopping')} Pedidos</div>
+          ${pedidos?.length ? pedidos.map(ped=>`<p style="font-size:13px">🛒 ${ped.associacoes?.nome||''} — ${statusBadge(ped.status)}</p>`).join('') : '<p style="font-size:13px;color:var(--cinza)">Nenhum pedido</p>'}
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn btn-outline" onclick="fecharModal()">Fechar</button>
+          <button class="btn btn-primary" onclick="avancarStatus('${id}','${p.status}');fecharModal()">Avançar status</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function uploadReceita(pacienteId) {
+  toast('Função de upload de receita — integre com Supabase Storage', 'error');
+}
+
+async function adicionarDoc(pacienteId) {
+  const nome = prompt('Nome do documento:');
+  const tipo = prompt('Tipo (rg_frente / rg_verso / comprovante_endereco / termo_ajuizamento):');
+  if (!nome || !tipo) return;
+  await db.from('documentos').insert({ paciente_id: pacienteId, tipo, nome, enviado_por: 'admin', data_doc: new Date().toISOString().split('T')[0] });
+  toast('Documento adicionado!');
+  await verPaciente(pacienteId);
+}
+
+function fecharModal() {
+  const m = document.getElementById('modal-paciente') || document.getElementById('modal-extra');
+  if (m) m.innerHTML = '';
+}
+
+// ============================
+// CONSULTAS
+// ============================
+async function renderConsultas() {
+  const main = document.getElementById('main-content');
+  main.innerHTML = `
+    <div class="page-header"><h1>Consultas</h1></div>
+    <div class="card"><div id="lista-consultas">Carregando...</div></div>
+    <div id="modal-paciente"></div>
+  `;
+  const { data } = await db.from('consultas').select('*, pacientes(nome)').order('criado_em', { ascending: false });
+  const el = document.getElementById('lista-consultas');
+  if (!data?.length) { el.innerHTML = '<p style="color:var(--cinza);font-size:13px">Nenhuma consulta registrada.</p>'; return; }
+  el.innerHTML = `<div class="table-wrap"><table>
+    <tr><th>Paciente</th><th>Data</th><th>Link Sala</th><th>Status</th></tr>
+    ${data.map(c=>`<tr>
+      <td>${c.pacientes?.nome||'-'}</td>
+      <td>${c.data_consulta?new Date(c.data_consulta).toLocaleDateString('pt-BR'):'-'}</td>
+      <td>${c.link_sala?`<a href="${c.link_sala}" target="_blank" style="color:var(--verde)">Abrir</a>`:'-'}</td>
+      <td>${statusBadge(c.status)}</td>
+    </tr>`).join('')}
+  </table></div>`;
+}
+
+// ============================
+// DOCUMENTOS
+// ============================
+async function renderDocumentos() {
+  const main = document.getElementById('main-content');
+  main.innerHTML = `<div class="page-header"><h1>Documentos</h1></div><div class="card"><div id="lista-docs">Carregando...</div></div>`;
+  const { data } = await db.from('documentos').select('*, pacientes(nome)').order('criado_em', { ascending: false });
+  const el = document.getElementById('lista-docs');
+  if (!data?.length) { el.innerHTML = '<p style="color:var(--cinza);font-size:13px">Nenhum documento.</p>'; return; }
+  el.innerHTML = `<div class="table-wrap"><table>
+    <tr><th>Paciente</th><th>Tipo</th><th>Nome</th><th>Enviado por</th><th>Data</th></tr>
+    ${data.map(d=>`<tr>
+      <td>${d.pacientes?.nome||'-'}</td>
+      <td><span class="badge badge-azul">${d.tipo}</span></td>
+      <td>${d.nome}</td>
+      <td>${d.enviado_por}</td>
+      <td>${d.data_doc?new Date(d.data_doc+'T00:00:00').toLocaleDateString('pt-BR'):'-'}</td>
+    </tr>`).join('')}
+  </table></div>`;
+}
+
+// ============================
+// PEDIDOS
+// ============================
+async function renderPedidos() {
+  const main = document.getElementById('main-content');
+  main.innerHTML = `<div class="page-header"><h1>Pedidos</h1></div><div class="card"><div id="lista-pedidos">Carregando...</div></div>`;
+  const { data } = await db.from('pedidos').select('*, pacientes(nome), associacoes(nome)').order('criado_em', { ascending: false });
+  const el = document.getElementById('lista-pedidos');
+  if (!data?.length) { el.innerHTML = '<p style="color:var(--cinza);font-size:13px">Nenhum pedido.</p>'; return; }
+  el.innerHTML = `<div class="table-wrap"><table>
+    <tr><th>Paciente</th><th>Associação</th><th>Valor</th><th>Status</th><th>Pagamento</th></tr>
+    ${data.map(p=>`<tr>
+      <td>${p.pacientes?.nome||'-'}</td>
+      <td>${p.associacoes?.nome||'-'}</td>
+      <td>${p.valor_total?'R$ '+Number(p.valor_total).toFixed(2):'-'}</td>
+      <td>${statusBadge(p.status)}</td>
+      <td>${p.forma_pagamento||'-'}</td>
+    </tr>`).join('')}
+  </table></div>`;
+}
+
+// ============================
+// ASSOCIAÇÕES
+// ============================
+async function renderAssociacoes() {
+  const main = document.getElementById('main-content');
+  main.innerHTML = `<div class="page-header"><h1>Associações</h1></div><div id="lista-assoc" class="assoc-grid" style="margin-top:1rem"></div>`;
+  const { data } = await db.from('associacoes').select('*');
+  const el = document.getElementById('lista-assoc');
+  el.innerHTML = (data||[]).map(a=>`
+    <div class="card" style="text-align:center">
+      <div style="font-size:28px;margin-bottom:8px">🌿</div>
+      <div style="font-weight:600;font-size:15px;margin-bottom:4px">${a.nome}</div>
+      <span class="badge ${a.tipo==='importacao'?'badge-azul':'badge-verde'}">${a.tipo}</span>
+      <div style="margin-top:10px;font-size:12px;color:var(--cinza)">Pagamento: ${a.forma_pagamento}</div>
+    </div>
+  `).join('');
+}
+
+// ============================
+// RECEITAS (MÉDICO)
+// ============================
+async function renderReceitas() {
+  const main = document.getElementById('main-content');
+  main.innerHTML = `<div class="page-header"><h1>Receitas</h1></div><div class="card"><div id="lista-rec">Carregando...</div></div>`;
+  const { data } = await db.from('receitas').select('*, pacientes(nome)').order('criado_em', { ascending: false });
+  const el = document.getElementById('lista-rec');
+  if (!data?.length) { el.innerHTML = '<p style="color:var(--cinza);font-size:13px">Nenhuma receita.</p>'; return; }
+  el.innerHTML = `<div class="table-wrap"><table>
+    <tr><th>Paciente</th><th>Arquivo</th><th>Data</th><th>Produtos extraídos</th></tr>
+    ${data.map(r=>`<tr>
+      <td>${r.pacientes?.nome||'-'}</td>
+      <td>${r.arquivo_nome||'-'}</td>
+      <td>${r.data_receita?new Date(r.data_receita+'T00:00:00').toLocaleDateString('pt-BR'):'-'}</td>
+      <td style="font-size:12px;color:var(--cinza)">${r.produtos_prescritos?JSON.stringify(r.produtos_prescritos):'Pendente'}</td>
+    </tr>`).join('')}
+  </table></div>`;
+}
+
+// ============================
+// PORTAL DO PACIENTE
+// ============================
+async function renderPatientPortal() {
+  const { data: paciente } = await db.from('pacientes').select('*').eq('user_id', currentUser.id).single();
+  const { data: assocs } = await db.from('associacoes').select('*');
+  const { data: receita } = await db.from('receitas').select('*').eq('paciente_id', paciente?.id).order('criado_em', { ascending: false }).limit(1);
+  const { data: docs } = await db.from('documentos').select('*').eq('paciente_id', paciente?.id);
+  const { data: termos } = await db.from('termos').select('*').eq('paciente_id', paciente?.id);
+
+  const status = paciente?.status || 'cadastrado';
+  const statusOrder = ['cadastrado','consulta_agendada','consulta_realizada','pos_consulta','pedido_feito','concluido'];
+  const statusIdx = statusOrder.indexOf(status);
+  const liberado = statusIdx >= 2; // consulta realizada ou mais
+
+  document.getElementById('root').innerHTML = `
+    <div class="patient-portal">
+      <div class="portal-header">
+        <h2>🌿 Clínica Cannabis</h2>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span style="font-size:14px">${currentPerfil?.nome||''}</span>
+          <button class="btn btn-sm" style="background:rgba(255,255,255,0.2);color:#fff;border:none" onclick="doLogout()">Sair</button>
+        </div>
+      </div>
+
+      <div class="portal-content">
+        <!-- ETAPAS -->
+        <div class="card" style="margin-bottom:1rem">
+          <div style="font-size:13px;font-weight:500;margin-bottom:12px">Sua jornada</div>
+          <div class="steps">
+            ${['Cadastro','Consulta','Documentos','Pedido','Concluído'].map((s,i)=>`
+              <div class="step">
+                <div class="step-dot ${statusIdx>i?'done':statusIdx===i?'active':'pending'}">${statusIdx>i?icon('check'):(i+1)}</div>
+                ${i<4?`<div class="step-line ${statusIdx>i?'done':''}"></div>`:''}
+              </div>
+            `).join('')}
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--cinza);margin-top:4px">
+            ${['Cadastro','Consulta','Documentos','Pedido','Concluído'].map(s=>`<span>${s}</span>`).join('')}
+          </div>
+        </div>
+
+        <!-- PRÉ-CONSULTA: ANAMNESE -->
+        <div class="portal-section">
+          <h3>📋 Anamnese</h3>
+          <p style="font-size:13px;color:var(--cinza);margin-bottom:1rem">Preencha antes da consulta com o médico.</p>
+          <div class="field"><label>Motivo da consulta</label><textarea id="an-motivo" placeholder="Descreva seu principal problema ou queixa..."></textarea></div>
+          <div class="field"><label>Doenças crônicas</label><input id="an-doencas" placeholder="Ex: diabetes, hipertensão..."/></div>
+          <div class="field"><label>Medicamentos em uso</label><input id="an-meds" placeholder="Liste os medicamentos atuais..."/></div>
+          <div class="field"><label>Alergias</label><input id="an-alergias" placeholder="Ex: dipirona, penicilina..."/></div>
+          <div class="field"><label>Já usou cannabis medicinal?</label><select id="an-cannabis"><option value="false">Não</option><option value="true">Sim</option></select></div>
+          <div class="field"><label>Expectativas</label><textarea id="an-exp" placeholder="O que espera do tratamento?"></textarea></div>
+          <button class="btn btn-primary" onclick="salvarAnamnese('${paciente?.id}')">Salvar anamnese</button>
+        </div>
+
+        <!-- PÓS-CONSULTA -->
+        ${!liberado ? `
+          <div class="portal-section">
+            <div class="lock-msg">${icon('lock')} Disponível após a consulta com o médico.</div>
+            <div class="locked">
+              <h3>📎 Documentos e Termos</h3>
+            </div>
+          </div>
+        ` : `
+          <div class="portal-section">
+            <h3>📎 Enviar documentos</h3>
+            <p style="font-size:13px;color:var(--cinza);margin-bottom:1rem">Envie os documentos solicitados.</p>
+            <div style="display:grid;gap:8px">
+              ${[['rg_frente','RG (frente)'],['rg_verso','RG (verso)'],['comprovante_endereco','Comprovante de endereço'],['termo_ajuizamento','Termo de ajuizamento']].map(([tipo,label])=>{
+                const enviado = docs?.find(d=>d.tipo===tipo);
+                return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--cinza-claro);border-radius:8px">
+                  <span style="font-size:13px">${label}</span>
+                  ${enviado ? `<span class="badge badge-verde">${icon('check')} Enviado</span>` : `<button class="btn btn-sm btn-outline" onclick="enviarDocPaciente('${paciente?.id}','${tipo}','${label}')">Enviar</button>`}
+                </div>`;
+              }).join('')}
+            </div>
+          </div>
+
+          <!-- TERMOS -->
+          <div class="portal-section">
+            <h3>✍️ Termos</h3>
+            ${[['ajuizamento','Termo de Ajuizamento'],['lgpd','Termo LGPD'],['consentimento','Consentimento Informado']].map(([tipo,label])=>{
+              const aceito = termos?.find(t=>t.tipo===tipo&&t.aceito);
+              return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--cinza-claro);border-radius:8px;margin-bottom:6px">
+                <span style="font-size:13px">${label}</span>
+                ${aceito ? `<span class="badge badge-verde">${icon('check')} Aceito</span>` : `<button class="btn btn-sm btn-primary" onclick="aceitarTermo('${paciente?.id}','${tipo}')">Li e aceito</button>`}
+              </div>`;
+            }).join('')}
+          </div>
+
+          <!-- ASSOCIAÇÕES E PEDIDO -->
+          <div class="portal-section">
+            <h3>🌿 Fazer pedido</h3>
+            ${!receita?.length ? '<p style="font-size:13px;color:var(--cinza)">Aguardando receita médica para liberar os produtos.</p>' : `
+              <p style="font-size:13px;color:var(--cinza);margin-bottom:1rem">Escolha a associação prescrita na sua receita:</p>
+              <div class="assoc-grid" id="assoc-grid">
+                ${(assocs||[]).map(a=>`
+                  <div class="assoc-card" onclick="selecionarAssoc('${a.id}','${a.nome}','${a.forma_pagamento}')">
+                    <div style="font-size:24px;margin-bottom:6px">🌿</div>
+                    <div class="assoc-name">${a.nome}</div>
+                    <div class="assoc-tipo">${a.tipo}</div>
+                    <div style="font-size:11px;color:var(--verde);margin-top:6px">${a.forma_pagamento==='lytex'?'Pagamento online':'PIX / Cartão'}</div>
+                  </div>
+                `).join('')}
+              </div>
+              <button class="btn btn-primary" style="margin-top:1rem;width:100%" onclick="finalizarPedido('${paciente?.id}')">Confirmar pedido</button>
+            `}
+          </div>
+        `}
+      </div>
+    </div>
+  `;
+}
+
+let assocSelecionada = null;
+function selecionarAssoc(id, nome, pagamento) {
+  assocSelecionada = { id, nome, pagamento };
+  document.querySelectorAll('.assoc-card').forEach(c => c.classList.remove('selected'));
+  event.currentTarget.classList.add('selected');
+}
+
+async function salvarAnamnese(pacienteId) {
+  if (!pacienteId) { toast('Perfil não encontrado', 'error'); return; }
+  const { error } = await db.from('anamneses').upsert({
+    paciente_id: pacienteId,
+    motivo_consulta: document.getElementById('an-motivo')?.value,
+    doencas_cronicas: document.getElementById('an-doencas')?.value,
+    medicamentos_uso: document.getElementById('an-meds')?.value,
+    alergias: document.getElementById('an-alergias')?.value,
+    uso_previo_cannabis: document.getElementById('an-cannabis')?.value === 'true',
+    expectativas: document.getElementById('an-exp')?.value,
+  });
+  if (error) { toast(error.message, 'error'); return; }
+  toast('Anamnese salva!');
+}
+
+async function enviarDocPaciente(pacienteId, tipo, label) {
+  const nome = prompt(`Nome do arquivo ${label}:`);
+  if (!nome) return;
+  await db.from('documentos').insert({ paciente_id: pacienteId, tipo, nome, enviado_por: 'paciente', data_doc: new Date().toISOString().split('T')[0] });
+  toast('Documento registrado!');
+  renderPatientPortal();
+}
+
+async function aceitarTermo(pacienteId, tipo) {
+  await db.from('termos').upsert({ paciente_id: pacienteId, tipo, aceito: true, assinado_em: new Date() });
+  toast('Termo aceito!');
+  renderPatientPortal();
+}
+
+async function finalizarPedido(pacienteId) {
+  if (!assocSelecionada) { toast('Selecione uma associação', 'error'); return; }
+  await db.from('pedidos').insert({
+    paciente_id: pacienteId,
+    associacao_id: assocSelecionada.id,
+    forma_pagamento: assocSelecionada.pagamento === 'lytex' ? 'lytex' : 'pix',
+    status: 'aguardando_pagamento'
+  });
+  await db.from('pacientes').update({ status: 'pedido_feito' }).eq('id', pacienteId);
+  toast('Pedido realizado! Aguarde as instruções de pagamento.');
+  renderPatientPortal();
+}
+
+// ============================
+// INIT
+// ============================
+async function init() {
+  const { data: { session } } = await db.auth.getSession();
+  if (session?.user) {
+    await loadUserAndRender(session.user);
+  } else {
+    renderAuth();
+  }
+}
+
+init();
+</script>
+</body>
+</html>
